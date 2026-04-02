@@ -25,7 +25,11 @@ public class ContributionSttScheduler {
                 contributionService.markProcessing(queued.getId());
 
                 String transcript = clovaSttClient.transcribeKorean(Path.of(queued.getRawAudioUrl()));
-                contributionService.markSttDone(queued.getId(), transcript);
+                if (transcript == null || transcript.isBlank()) {
+                    contributionService.markFailed(queued.getId(), "STT_EMPTY", "Transcript was empty");
+                } else {
+                    contributionService.saveTranscriptAndPublish(queued.getId(), transcript);
+                }
             } catch (ApiException e) {
                 Object reason = e.getDetails().get("reason");
                 String message = (reason == null ? "" : ("reason=" + reason + " ")) + e.getMessage();

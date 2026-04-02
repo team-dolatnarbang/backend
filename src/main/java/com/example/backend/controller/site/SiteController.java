@@ -8,7 +8,7 @@ import com.example.backend.dto.site.response.CompleteListenResponse;
 import com.example.backend.dto.site.response.SiteDetailResponse;
 import com.example.backend.dto.site.response.SiteSummaryResponse;
 import com.example.backend.dto.site.response.SitesResponse;
-import com.example.backend.service.progress.ListenService;
+import com.example.backend.service.progress.ListenCompletionService;
 import com.example.backend.service.site.SiteQueryService;
 import com.example.backend.service.site.SiteService;
 import java.util.List;
@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -31,7 +31,7 @@ public class SiteController {
 
     private final SiteService siteService;
     private final SiteQueryService siteQueryService;
-    private final ListenService listenService;
+    private final ListenCompletionService listenCompletionService;
 
     // 유적지 목록 조회 API
     @GetMapping
@@ -42,30 +42,20 @@ public class SiteController {
         return ResponseEntity.ok(ApiResponse.ok(new SitesResponse(sites)));
     }
 
-    // 유적지 상세 조회 API - 잠김이면 403 반환
+    // 유적지 상세 조회 API
     @GetMapping("/{siteId}")
-    public ResponseEntity<ApiResponse<SiteDetailResponse>> getSite(
-            @PathVariable String siteId,
-            @RequestHeader(name = "X-Session-Id", required = false) String sessionId
-    ) {
-        if (sessionId == null || sessionId.isBlank()) {
-            throw new ApiException(ErrorCode.VALIDATION_ERROR);
-        }
-
+    public ResponseEntity<ApiResponse<SiteDetailResponse>> getSite(@PathVariable String siteId) {
         UUID parsedSiteId;
-        UUID parsedSessionId;
         try {
             parsedSiteId = UUID.fromString(siteId);
-            parsedSessionId = UUID.fromString(sessionId);
         } catch (IllegalArgumentException e) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR);
         }
 
-        SiteDetailResponse body = siteQueryService.getSiteDetail(parsedSiteId, parsedSessionId);
+        SiteDetailResponse body = siteQueryService.getSiteDetail(parsedSiteId);
         return ResponseEntity.ok(ApiResponse.ok(body));
     }
 
-    // 청취 완료 처리 API - 완료 저장 및 nextSiteId 반환
     @PostMapping("/{siteId}/complete-listen")
     public ResponseEntity<ApiResponse<CompleteListenResponse>> completeListen(
             @PathVariable String siteId,
@@ -85,7 +75,8 @@ public class SiteController {
             throw new ApiException(ErrorCode.VALIDATION_ERROR);
         }
 
-        CompleteListenResponse body = listenService.completeListen(parsedSiteId, parsedSessionId, request);
+        Integer duration = request != null ? request.durationListenedSec() : null;
+        CompleteListenResponse body = listenCompletionService.completeListen(parsedSessionId, parsedSiteId, duration);
         return ResponseEntity.ok(ApiResponse.ok(body));
     }
 }

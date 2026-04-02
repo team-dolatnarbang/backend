@@ -1,6 +1,6 @@
 # '제주 온기' API 명세서
 
-> **버전:** 0.6 (해커톤 초안)  
+> **버전:** 0.10 (해커톤 초안)  
 > **Base URL:** `https://api/v1` (배포 시 교체)  
 > **포맷:** JSON (`Content-Type: application/json`)  
 > **인증:** **로그인 없음.** 일반 유저는 **닉네임만**으로 헌화 메시지를 남길 수 있으며, 닉네임은 **중복 허용**. 시니어(어르신)도 로그인 없이 **이름 입력 → 지역(유적지) 선택 → 음성 녹음** 순서의 클라이언트 플로우에 맞춰, 업로드 요청에 이름·`siteId`·음성 파일을 함께 보낸다.
@@ -69,7 +69,7 @@
 
 로그인은 사용하지 않는다.
 
-- **지도 핑(진행/잠금):** 서버가 `unlocked`/`listenCompleted`를 판단하므로, 클라이언트는 헤더 **`X-Session-Id: <uuid>`** 로 **익명 세션**을 식별한다.
+- **지도 핑(진행/잠금):** (현재) 청취 순서·해금은 **클라이언트**에서 처리한다. `GET /sites`·`GET /sites/{id}`는 세션 없이 호출한다. 헌화·업로드 등 다른 API는 필요 시 **`X-Session-Id: <uuid>`** 로 익명 세션을 식별한다.
 - **진행 리셋:** 플로우 마지막에서 “맨 처음으로 돌아가기”를 누르면 진행이 초기화된다. 서버는 `X-Session-Id` 기준으로 **회차(`resetVersion`)** 를 증가시키고, 이후 진행 판단은 해당 회차 기준으로 수행한다.
 - **시니어 음성 업로드:** 동일하게 **`X-Session-Id`** 를 쓸 수 있다. 업로드 시 서버에 전달하면 기록과 연결해 두고, §7.0·`GET /contributions`(선택)에서 활용한다.
 
@@ -77,14 +77,13 @@
 
 ## 3. 유적지(Site)
 
-### 3.1 유적지 목록 조회
+지역 **이름·사진·관광 안내 음성** 등은 클라이언트 정적 데이터로 둔다. 백엔드는 **시니어 기록에 붙는 `siteId`·순서**와 **해당 지역의 게시된 시니어 스토리(무작위 1건)** 만 내려주며, **지역별 청취 완료**는 `POST /sites/{siteId}/complete-listen`으로 `siteId`(DB와 동일 UUID)·`X-Session-Id` 기준으로 저장한다(§4).
+
+### 3.1 유적지 목록 조회 (식별자)
 
 **`GET /sites`**
 
-순서대로 정렬된 약 5개 유적지. 각 항목에 `order` (1~5), 잠금 여부는 진행 API와 조합.
-
-정적 리소스(이미지/오디오)는 S3 등 외부 스토리지를 쓰지 않을 수 있다. 이 경우 서버/프론트가 제공하는 정적 서버 경로를 사용하며,
-API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narrationAudioUrl` 등)만 반환한다.
+`order` 오름차순 정렬. 항목은 **`id`**, **`order`** 만 포함한다. (시니어 업로드·지도 핀 매핑용.)
 
 **응답 `200`**
 
@@ -93,20 +92,17 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
   "sites": [
     {
       "id": "uuid",
-      "order": 1,
-      "name": "○○ 마을 터",
-      "imageUrl": "/static/sites/1.jpg",
-      "shortDescription": "한 줄 소개"
+      "order": 1
     }
   ]
 }
 ```
 
-### 3.2 유적지 상세 (관광 설명 + 잠금 상태)
+### 3.2 유적지 상세 (시니어 스토리)
 
 **`GET /sites/{siteId}`**
 
-요청 헤더(권장): `X-Session-Id: <uuid>` — 잠금/진행 판단에 사용.
+헤더·세션 없이 조회 가능.
 
 **응답 `200`**
 
@@ -114,21 +110,13 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
 {
   "id": "uuid",
   "order": 1,
-  "name": "○○ 마을 터",
-  "narrationAudioUrl": "/static/narrations/site-1.mp3",
-  "narrationDurationSec": 120,
-  "unlocked": true,
-  "listenCompleted": false,
   "elderStory": {
-    "audioUrl": "/static/tts/contributions/uuid.mp3"
+    "audioUrl": "/contributions/uuid/audio"
   }
 }
 ```
 
-- `unlocked`: 이전 `order` 유적지 청취 완료 시 `true` (첫 번째는 항상 `true`).
-- `elderStory`: 해당 지역에 등록된 시니어 기록이 여러 건이면 **서버에서 무작위 1건** 선택. 게시된 기록이 없으면 `null`일 수 있다.
-
-**`403`** — 아직 이전 핑 미완료.
+- `elderStory`: 해당 지역에 `PUBLISHED` 시니어 기록이 여러 건이면 **서버에서 무작위 1건** 선택. 없으면 `null`.
 
 ---
 
@@ -142,6 +130,8 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
 
 본문: 선택적으로 `{ "durationListenedSec": 90 }` (분석·어뷰징 완화용).
 
+서버는 **`listen_completions`** 에 `(세션, siteId, resetVersion)` 단위로 완료를 기록한다. `siteId`는 **`GET /sites`와 동일한 DB 식별자**여야 한다. **`order`가 더 작은 유적지**를 아직 완료하지 않았으면 **`403` (`SITE_LOCKED`)** — 이전 순서 핑을 먼저 완료해야 한다. 동일 `(세션, siteId, 회차)`로 재호출하면 멱등적으로 동일 형태로 성공한다.
+
 **성공 `200`**
 
 ```json
@@ -153,15 +143,17 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
 ```
 
 - 마지막 유적지면 `nextSiteId`는 `null`.
-- 고정 내레이션 + 시니어 스토리 모두 “청취 완료” 조건은 기획에 따라 단일 완료 또는 두 트랙 분리 가능. (초안: **한 번의 완료 호출**로 해당 핑 통과.)
+- 한 지역에서 안내 음성·시니어 스토리를 모두 들었을 때 클라이언트가 **한 번** 호출하는 것을 권장(세부는 프론트).
 
-**`403`** — `unlocked`가 아닌 경우.
+**`403`** — 이전 순서 유적지 미완료(`SITE_LOCKED`).
 
 ---
 
-## 5. 마지막 헌화 메시지·동백 적립 (결제·PG 없음)
+## 5. 마지막 플로우 후기(헌화)·동백 적립 (결제·PG 없음)
 
-일반 유저는 **계정·로그인 없이** 마지막 화면에서 헌화 메시지를 남긴다. 표시 이름은 **`nickname`** 한 필드만 사용한다. **동일 닉네임 다수 허용**(UNIQUE 제약 없음).
+일반 유저는 **계정·로그인 없이** 전 지역 청취를 마친 뒤 마지막 화면에서 **후기(헌화) 메시지**를 남긴다. 표시 이름은 **`nickname`** 한 필드만 사용한다. **동일 닉네임 다수 허용**(UNIQUE 제약 없음).
+
+API 경로: **`POST /tributes`** · **`POST /reviews`** 는 동일(후기 작성). **`GET /tributes`** · **`GET /reviews`** 는 동일(공개 피드).
 
 ### 5.0 적립 규칙 (시스템)
 
@@ -169,9 +161,9 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
 - 사용자에게는 **카드 결제·PG·포트원 등 결제 연동이 없다.**
 - 화면에 보이는 “모인 기부금”은 **위 환산 규칙으로 계산된 합계(가상 적립액)**이며, 실제 자금 이전은 **제휴 기업·사회적 기부 약속** 등 기획 스토리에 맡긴다.
 
-### 5.1 마지막 헌화 생성 (즉시 반영)
+### 5.1 후기(헌화) 생성 (즉시 반영)
 
-**`POST /tributes`**
+**`POST /tributes`** 또는 **`POST /reviews`**
 
 요청 헤더(필수): `X-Session-Id: <uuid>`
 
@@ -183,9 +175,10 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
 }
 ```
 
-- `nickname`: 필수. 길이·금칙어 정책은 서버 검증으로 정함. **중복 가능.**
+- `nickname`: 필수, 앞뒤 공백 제거 후 **1~50자**. **중복 가능.**
+- `message`: 필수, 앞뒤 공백 제거 후 **1~500자**.
 - `idempotencyKey`: (권장) 동일 키로 재요청 시 **기존 헌화 1건만** 유지하고 중복 적립 방지.
-- 사전조건: 해당 세션의 **현재 회차(`resetVersion`)** 에서 모든 핑을 완료해야 한다. 미완료 시 `403`.
+- 사전조건: 해당 세션의 **현재 회차(`resetVersion`)** 에서 **모든 유적지에 대해** `POST /sites/{siteId}/complete-listen` 완료 기록이 있어야 한다(§4). 미완료 시 **`403` (`TRIBUTE_NOT_ALLOWED_YET`)**.
 
 **응답 `201`**
 
@@ -201,9 +194,9 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
 - `camelliaCount`: 이번 회차에서 완료한 핑 수(=모은 꽃잎 개수).
 - `pledgedAmountWon`: 이번 요청으로 시스템에 **적립된 원화 상당액**. 원칙적으로 `camelliaCount × 1000` 과 일치.
 
-### 5.2 헌화 메시지 목록 (공개 피드)
+### 5.2 후기(헌화) 공개 목록
 
-**`GET /tributes`**
+**`GET /tributes`** 또는 **`GET /reviews`**
 
 쿼리: `page`, `size`.
 
@@ -329,7 +322,7 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
 
 **`400`** — 120초 초과, `contributorName`/`siteId` 누락 등.
 
-### 7.2 처리 상태 조회 (해당 구술 기록이 지금 어느 단계까지 처리됐는지(STT 완료/정제 완료/TTS 완료/게시됨/실패)를 확인하는 폴링용 API)
+### 7.2 처리 상태 조회 (폴링용)
 
 **`GET /contributions/{contributionId}`**
 
@@ -342,23 +335,32 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
   "id": "uuid",
   "siteId": "uuid",
   "contributorName": "김○○",
-  "status": "QUEUED | PROCESSING | STT_DONE | CORRECTED | TTS_DONE | PUBLISHED | FAILED",
-  "rawTranscript": "선택 노출 (관리자만)",
-  "correctedText": "정제된 텍스트",
-  "ttsAudioUrl": "https://...",
+  "status": "QUEUED | PROCESSING | PUBLISHED | FAILED",
+  "rawTranscript": "STT로 처리된 원문 (PUBLISHED 이후에도 동일 기록에 남음)",
+  "correctedText": null,
+  "ttsAudioUrl": null,
   "error": null
 }
 ```
 
-내부 파이프라인:
+**현재 구현 기준 파이프라인 (원본 음성 청취):**
 
-1. **STT** (예: Whisper) → 원문 텍스트  
-2. **LLM 정제** (예: GPT-4o) → 구술 톤 유지·추임새 정리  
-3. **DB 저장**  
-4. **TTS** (예: Google / Naver / ElevenLabs) → `ttsAudioUrl`  
-5. `PUBLISHED` 시 일반 유저 `GET /sites/{id}`의 `elderStory` 풀에 포함
+1. 업로드 → `QUEUED` (서버에 원본 파일 저장, `rawAudioUrl`).
+2. 워커가 **STT**(예: CLOVA) → 인식 문장을 **`rawTranscript`로 DB 저장** → 곧바로 **`PUBLISHED`**.
+3. 일반 유저는 `GET /sites/{siteId}`의 `elderStory.audioUrl`(예: `/contributions/{id}/audio`)로 **업로드한 원본 녹음**을 재생한다.
+4. (향후) LLM 정제·TTS를 넣을 경우 `STT_DONE`·`CORRECTED`·`TTS_DONE` 등 상태와 `ttsAudioUrl`을 확장할 수 있다.
 
-**재생 속도 1.25배**는 클라이언트 오디오 플레이어에서 처리 가능 (서버 API 불필요).
+### 7.2a 원본 음성 스트리밍 (재생)
+
+**`GET /contributions/{contributionId}/audio`**
+
+- **`PUBLISHED`** 인 기록만 `200` 및 오디오 바이너리(`Content-Type`은 파일에 따라 자동 추론).
+- 미게시·없음 → **`404`** (존재하지 않는 리소스로 응답).
+
+클라이언트는 API 베이스 URL과 위 경로를 이어 전체 URL을 구성한다.
+
+**재생 속도 1.25배** 등은 클라이언트 플레이어에서 처리.
+
 
 ### 7.3 (선택) 시니어 기록 목록·승인
 
@@ -408,3 +410,6 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
 | 2026-04-02 | v0.4: 통계 **비실시간**. 약 **10분** 갱신·캐시 정책, `refreshIntervalSec`, `Cache-Control` 권장. WebSocket 통계 제거. |
 | 2026-04-02 | v0.5: 시니어 업로드 후 **처리 상태 추적** — §7.0 `localStorage` 권장, 선택 `X-Session-Id`·§7.1a `GET /contributions`. §2.4 보강. |
 | 2026-04-02 | v0.6: 좌표 제거. 진행에 `X-Session-Id` 필수화 및 회차(`resetVersion`) 도입. 핑 완료로 꽃잎 적립 후 마지막에만 헌화 메시지 생성. `Tribute(siteId)` → `FinalTribute(sessionId, resetVersion)` 개념으로 변경. |
+| 2026-04-03 | v0.8: `GET /sites`·상세 응답 슬림화(식별자+시니어 스토리). 시니어 파이프라인 STT→DB→즉시 `PUBLISHED`, 청취는 `GET /contributions/{id}/audio` 원본 스트리밍. 업로드 `201`. |
+| 2026-04-03 | v0.9: `POST /sites/{siteId}/complete-listen`으로 지역별 청취 완료 DB 저장(순차 `order` 검증). `POST /tributes`는 동일 회차에서 전 지역 완료 후에만 허용. |
+| 2026-04-03 | v0.10: 후기 API 별칭 `GET/POST /reviews`, 후기 생성 응답 `201`, 닉네임·메시지 길이 검증(50·500자). |

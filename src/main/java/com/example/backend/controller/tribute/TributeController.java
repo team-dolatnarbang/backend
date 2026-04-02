@@ -9,6 +9,7 @@ import com.example.backend.dto.tribute.response.TributesResponse;
 import com.example.backend.service.tribute.TributeService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,13 +20,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/tributes")
+@RequestMapping({"/tributes", "/reviews"})
 @RequiredArgsConstructor
 public class TributeController {
 
     private final TributeService tributeService;
 
-    // 마지막 헌화 생성 API - 회차당 1회, 멱등키 지원
+    // 마지막 플로우 후기(헌화) 생성 — 회차당 1회, 멱등키 지원. `/reviews` 는 동일 동작의 별칭.
     @PostMapping
     public ResponseEntity<ApiResponse<CreateTributeResponse>> create(
             @RequestHeader(name = "X-Session-Id", required = false) String sessionId,
@@ -33,10 +34,10 @@ public class TributeController {
     ) {
         UUID parsedSessionId = parseSessionId(sessionId);
         CreateTributeResponse body = tributeService.create(parsedSessionId, request);
-        return ResponseEntity.ok(ApiResponse.ok(body));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(body));
     }
 
-    // 헌화 메시지 피드 조회 API
+    // 후기(헌화) 공개 목록
     @GetMapping
     public ResponseEntity<ApiResponse<TributesResponse>> list(
             @RequestParam(defaultValue = "1") int page,

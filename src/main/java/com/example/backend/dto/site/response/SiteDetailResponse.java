@@ -6,29 +6,10 @@ import java.util.UUID;
 public record SiteDetailResponse(
         UUID id,
         int order,
-        String name,
-        String narrationAudioUrl,
-        int narrationDurationSec,
-        boolean unlocked,
-        boolean listenCompleted,
         ElderStoryResponse elderStory
 ) {
-    public static SiteDetailResponse of(
-            Site site,
-            boolean unlocked,
-            boolean listenCompleted,
-            ElderStoryResponse elderStory
-    ) {
-        return new SiteDetailResponse(
-                site.getId(),
-                site.getOrder(),
-                site.getName(),
-                site.getNarrationAudioUrl(),
-                site.getNarrationDurationSec(),
-                unlocked,
-                listenCompleted,
-                elderStory
-        );
+    public static SiteDetailResponse of(Site site, ElderStoryResponse elderStory) {
+        return new SiteDetailResponse(site.getId(), site.getOrder(), elderStory);
     }
 }
 
