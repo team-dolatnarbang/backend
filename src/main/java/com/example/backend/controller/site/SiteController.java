@@ -3,9 +3,12 @@ package com.example.backend.controller.site;
 import com.example.backend.common.error.ApiException;
 import com.example.backend.common.error.ErrorCode;
 import com.example.backend.common.response.ApiResponse;
+import com.example.backend.dto.site.request.CompleteListenRequest;
+import com.example.backend.dto.site.response.CompleteListenResponse;
 import com.example.backend.dto.site.response.SiteDetailResponse;
 import com.example.backend.dto.site.response.SiteSummaryResponse;
 import com.example.backend.dto.site.response.SitesResponse;
+import com.example.backend.service.progress.ListenService;
 import com.example.backend.service.site.SiteQueryService;
 import com.example.backend.service.site.SiteService;
 import java.util.List;
@@ -15,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,7 +31,9 @@ public class SiteController {
 
     private final SiteService siteService;
     private final SiteQueryService siteQueryService;
+    private final ListenService listenService;
 
+    // 유적지 목록 조회 API
     @GetMapping
     public ResponseEntity<ApiResponse<SitesResponse>> listSites() {
         List<SiteSummaryResponse> sites = siteService.listSites().stream()
@@ -35,6 +42,7 @@ public class SiteController {
         return ResponseEntity.ok(ApiResponse.ok(new SitesResponse(sites)));
     }
 
+    // 유적지 상세 조회 API - 잠김이면 403 반환
     @GetMapping("/{siteId}")
     public ResponseEntity<ApiResponse<SiteDetailResponse>> getSite(
             @PathVariable String siteId,
@@ -54,6 +62,30 @@ public class SiteController {
         }
 
         SiteDetailResponse body = siteQueryService.getSiteDetail(parsedSiteId, parsedSessionId);
+        return ResponseEntity.ok(ApiResponse.ok(body));
+    }
+
+    // 청취 완료 처리 API - 완료 저장 및 nextSiteId 반환
+    @PostMapping("/{siteId}/complete-listen")
+    public ResponseEntity<ApiResponse<CompleteListenResponse>> completeListen(
+            @PathVariable String siteId,
+            @RequestHeader(name = "X-Session-Id", required = false) String sessionId,
+            @RequestBody(required = false) CompleteListenRequest request
+    ) {
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        }
+
+        UUID parsedSiteId;
+        UUID parsedSessionId;
+        try {
+            parsedSiteId = UUID.fromString(siteId);
+            parsedSessionId = UUID.fromString(sessionId);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        }
+
+        CompleteListenResponse body = listenService.completeListen(parsedSiteId, parsedSessionId, request);
         return ResponseEntity.ok(ApiResponse.ok(body));
     }
 }

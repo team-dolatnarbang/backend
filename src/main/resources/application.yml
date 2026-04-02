@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: backend
+  datasource:
+    #url: jdbc:postgresql://postgres:5432/groomthon
+    url: jdbc:postgresql://localhost:5432/groomthon
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+server:
+  port: 8080
+
+file:
+  upload-dir: /app/audio
+
+clova:
+  stt:
+    invoke-url: ${CLOVA_STT_INVOKE_URL:}
+    secret: ${CLOVA_STT_SECRET:}
+
+stt:
+  worker:
+    fixed-delay-ms: 5000
+
