@@ -3,6 +3,7 @@ package com.example.backend.controller.contribution;
 import com.example.backend.common.error.ApiException;
 import com.example.backend.common.error.ErrorCode;
 import com.example.backend.common.response.ApiResponse;
+import com.example.backend.domain.contribution.ElderContribution;
 import com.example.backend.dto.contribution.response.ContributionStatusResponse;
 import com.example.backend.dto.contribution.response.ContributionUploadResponse;
 import com.example.backend.service.contribution.ContributionService;
@@ -10,9 +11,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -68,7 +74,44 @@ public class ContributionController {
                 rawAudioUrl,
                 parsedSessionId
         );
-        return ResponseEntity.ok(ApiResponse.ok(body));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(body));
+    }
+
+    // PUBLISHED 상태인 원본 녹음 파일만 스트리밍한다.
+    @GetMapping("/{contributionId}/audio")
+    public ResponseEntity<Resource> streamPublishedAudio(@PathVariable String contributionId) {
+        UUID parsedContributionId;
+        try {
+            parsedContributionId = UUID.fromString(contributionId);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR);
+        }
+
+        ElderContribution contribution = contributionService.getPublishedForPlayback(parsedContributionId);
+        Path path = Path.of(contribution.getRawAudioUrl()).toAbsolutePath().normalize();
+        if (!Files.isRegularFile(path)) {
+            throw new ApiException(ErrorCode.NOT_FOUND, Map.of("contributionId", contributionId));
+        }
+
+        Path baseDir = Path.of(uploadDir).toAbsolutePath().normalize();
+        if (!path.startsWith(baseDir)) {
+            throw new ApiException(ErrorCode.NOT_FOUND, Map.of("contributionId", contributionId));
+        }
+
+        FileSystemResource resource = new FileSystemResource(path);
+        MediaType contentType = MediaType.APPLICATION_OCTET_STREAM;
+        try {
+            String probed = Files.probeContentType(path);
+            if (probed != null && !probed.isBlank()) {
+                contentType = MediaType.parseMediaType(probed);
+            }
+        } catch (Exception ignored) {
+        }
+
+        return ResponseEntity.ok()
+                .contentType(contentType)
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
+                .body(resource);
     }
 
     // 시니어 구술 처리 상태 조회 API

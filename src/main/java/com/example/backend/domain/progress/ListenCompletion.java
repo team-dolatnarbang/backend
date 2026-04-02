@@ -21,7 +21,7 @@ import org.hibernate.annotations.Comment;
         name = "listen_completions",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_listen_completion_session_site_version",
+                        name = "uk_listen_session_site_version",
                         columnNames = {"session_id", "site_id", "reset_version"}
                 )
         }
@@ -30,17 +30,16 @@ public class ListenCompletion {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Comment("청취 완료 이벤트 ID")
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "session_id", nullable = false)
-    @Comment("익명 세션")
+    @Comment("익명 세션(X-Session-Id)")
     private AnonymousSession session;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "site_id", nullable = false)
-    @Comment("청취 완료한 유적지")
+    @Comment("유적지")
     private Site site;
 
     @Column(name = "reset_version", nullable = false)
@@ -52,7 +51,7 @@ public class ListenCompletion {
     private Instant completedAt;
 
     @Column
-    @Comment("클라이언트가 보낸 청취 시간(초)")
+    @Comment("클라이언트가 보낸 청취 시간(초), 선택")
     private Integer durationListenedSec;
 
     protected ListenCompletion() {
@@ -96,4 +95,3 @@ public class ListenCompletion {
         return durationListenedSec;
     }
 }
-

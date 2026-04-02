@@ -4,4 +4,3 @@ public record CompleteListenRequest(
         Integer durationListenedSec
 ) {
 }
-

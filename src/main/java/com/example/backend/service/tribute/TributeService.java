@@ -9,12 +9,11 @@ import com.example.backend.dto.tribute.response.CreateTributeResponse;
 import com.example.backend.dto.tribute.response.TributeFeedItemResponse;
 import com.example.backend.dto.tribute.response.TributesResponse;
 import com.example.backend.repository.FinalTributeRepository;
-import com.example.backend.repository.ListenCompletionRepository;
 import com.example.backend.repository.SiteRepository;
+import com.example.backend.service.progress.ListenCompletionService;
 import com.example.backend.service.session.SessionService;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -29,20 +28,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class TributeService {
 
     private static final int PLEDGE_UNIT_WON = 1000;
+    private static final int NICKNAME_MAX_LEN = 50;
+    private static final int MESSAGE_MAX_LEN = 500;
 
     private final SessionService sessionService;
     private final SiteRepository siteRepository;
-    private final ListenCompletionRepository listenCompletionRepository;
     private final FinalTributeRepository finalTributeRepository;
+    private final ListenCompletionService listenCompletionService;
 
     public CreateTributeResponse create(UUID sessionId, CreateTributeRequest request) {
         Objects.requireNonNull(sessionId, "sessionId");
         Objects.requireNonNull(request, "request");
 
-        if (request.nickname() == null || request.nickname().isBlank()) {
+        String nickname = request.nickname() == null ? "" : request.nickname().trim();
+        String message = request.message() == null ? "" : request.message().trim();
+        if (nickname.isEmpty() || nickname.length() > NICKNAME_MAX_LEN) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR);
         }
-        if (request.message() == null || request.message().isBlank()) {
+        if (message.isEmpty() || message.length() > MESSAGE_MAX_LEN) {
             throw new ApiException(ErrorCode.VALIDATION_ERROR);
         }
         if (request.idempotencyKey() == null) {
@@ -64,27 +67,20 @@ public class TributeService {
             return toCreateResponse(existing);
         }
 
-        long totalSites = siteRepository.count();
-        long completedSites = listenCompletionRepository.countBySession_SessionIdAndResetVersion(sessionId, resetVersion);
-        if (completedSites < totalSites) {
-            throw new ApiException(
-                    ErrorCode.TRIBUTE_NOT_ALLOWED_YET,
-                    Map.of(
-                            "completedSites", completedSites,
-                            "requiredSites", totalSites,
-                            "resetVersion", resetVersion
-                    )
-            );
+        if (!listenCompletionService.hasCompletedAllSites(sessionId, resetVersion)) {
+            throw new ApiException(ErrorCode.TRIBUTE_NOT_ALLOWED_YET);
         }
 
-        int camelliaCount = (int) completedSites;
+        long totalSites = siteRepository.count();
+
+        int camelliaCount = (int) totalSites;
         int pledgedAmountWon = camelliaCount * PLEDGE_UNIT_WON;
 
         FinalTribute tribute = new FinalTribute(
                 session,
                 resetVersion,
-                request.nickname(),
-                request.message(),
+                nickname,
+                message,
                 camelliaCount,
                 pledgedAmountWon,
                 request.idempotencyKey(),

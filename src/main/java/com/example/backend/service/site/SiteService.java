@@ -20,7 +20,7 @@ public class SiteService {
     private final SiteRepository siteRepository;
 
     public List<Site> listSites() {
-        return siteRepository.findAll();
+        return siteRepository.findAllByOrderByOrderAsc();
     }
 
     public Site getSite(UUID siteId) {

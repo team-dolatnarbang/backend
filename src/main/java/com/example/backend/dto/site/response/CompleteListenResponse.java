@@ -7,8 +7,4 @@ public record CompleteListenResponse(
         boolean listenCompleted,
         UUID nextSiteId
 ) {
-    public static CompleteListenResponse completed(UUID siteId, UUID nextSiteId) {
-        return new CompleteListenResponse(siteId, true, nextSiteId);
-    }
 }
-

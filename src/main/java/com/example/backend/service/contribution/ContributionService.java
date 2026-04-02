@@ -99,7 +99,7 @@ public class ContributionService {
         return contribution;
     }
 
-    public ElderContribution markSttDone(UUID contributionId, String rawTranscript) {
+    public ElderContribution saveTranscriptAndPublish(UUID contributionId, String rawTranscript) {
         Objects.requireNonNull(contributionId, "contributionId");
         String contributionIdValue = contributionId.toString();
         ElderContribution contribution = elderContributionRepository.findById(contributionId)
@@ -109,9 +109,24 @@ public class ContributionService {
                 ));
 
         contribution.setRawTranscript(rawTranscript);
-        contribution.setStatus(ElderContribution.Status.STT_DONE);
+        contribution.setStatus(ElderContribution.Status.PUBLISHED);
         contribution.setErrorCode(null);
         contribution.setErrorMessage(null);
+        return elderContributionRepository.save(contribution);
+    }
+
+    @Transactional(readOnly = true)
+    public ElderContribution getPublishedForPlayback(UUID contributionId) {
+        Objects.requireNonNull(contributionId, "contributionId");
+        String contributionIdValue = contributionId.toString();
+        ElderContribution contribution = elderContributionRepository.findById(contributionId)
+                .orElseThrow(() -> new ApiException(
+                        ErrorCode.NOT_FOUND,
+                        Map.of("contributionId", contributionIdValue)
+                ));
+        if (contribution.getStatus() != ElderContribution.Status.PUBLISHED) {
+            throw new ApiException(ErrorCode.NOT_FOUND, Map.of("contributionId", contributionIdValue));
+        }
         return contribution;
     }
 
