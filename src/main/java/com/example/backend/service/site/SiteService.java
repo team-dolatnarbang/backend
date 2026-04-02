@@ -8,18 +8,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class SiteService {
 
     private final SiteRepository siteRepository;
-
-    public SiteService(SiteRepository siteRepository) {
-        this.siteRepository = siteRepository;
-    }
 
     public List<Site> listSites() {
         return siteRepository.findAll();
