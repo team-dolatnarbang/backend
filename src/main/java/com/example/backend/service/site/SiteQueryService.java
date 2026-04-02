@@ -52,7 +52,7 @@ public class SiteQueryService {
         }
 
         ElderStoryResponse elderStory = pickRandomElderStory(siteId);
-        return SiteDetailResponse.of(site, true, listenCompleted, elderStory);
+        return SiteDetailResponse.of(site, unlocked, listenCompleted, elderStory);
     }
 
     private boolean isUnlocked(Site site, UUID sessionId, int resetVersion) {
