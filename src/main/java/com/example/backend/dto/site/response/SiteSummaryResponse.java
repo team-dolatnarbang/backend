@@ -5,10 +5,11 @@ import java.util.UUID;
 
 public record SiteSummaryResponse(
         UUID id,
-        int order
+        int order,
+        String name
 ) {
     public static SiteSummaryResponse from(Site site) {
-        return new SiteSummaryResponse(site.getId(), site.getOrder());
+        return new SiteSummaryResponse(site.getId(), site.getOrder(), site.getName());
     }
 }
 
