@@ -115,22 +115,18 @@ API는 해당 파일을 가리키는 **문자열 URL/경로**(`imageUrl`, `narra
   "id": "uuid",
   "order": 1,
   "name": "○○ 마을 터",
-  "imageUrl": "/static/sites/1.jpg",
-  "descriptionText": "당시 상황과 장소 설명 (고정 카피)",
   "narrationAudioUrl": "/static/narrations/site-1.mp3",
   "narrationDurationSec": 120,
   "unlocked": true,
   "listenCompleted": false,
   "elderStory": {
-    "text": "정제된 구술 텍스트 (랜덤 1건)",
-    "audioUrl": "/static/tts/contributions/uuid.mp3",
-    "contributorLabel": "시니어가 입력한 이름(표시용)"
+    "audioUrl": "/static/tts/contributions/uuid.mp3"
   }
 }
 ```
 
 - `unlocked`: 이전 `order` 유적지 청취 완료 시 `true` (첫 번째는 항상 `true`).
-- `elderStory`: 해당 지역에 등록된 시니어 기록이 여러 건이면 **서버에서 무작위 1건** 선택.
+- `elderStory`: 해당 지역에 등록된 시니어 기록이 여러 건이면 **서버에서 무작위 1건** 선택. 게시된 기록이 없으면 `null`일 수 있다.
 
 **`403`** — 아직 이전 핑 미완료.
 

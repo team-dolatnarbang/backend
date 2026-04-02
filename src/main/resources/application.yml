@@ -2,8 +2,8 @@ spring:
   application:
     name: backend
   datasource:
-    #url: jdbc:postgresql://postgres:5432/groomthon
-    url: jdbc:postgresql://localhost:5432/groomthon
+    url: jdbc:postgresql://postgres:5432/groomthon
+    #url: jdbc:postgresql://localhost:5432/groomthon
     username: postgres
     password: postgres
   jpa:
