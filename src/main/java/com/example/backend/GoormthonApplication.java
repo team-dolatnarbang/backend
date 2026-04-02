@@ -12,7 +12,7 @@ public class GoormthonApplication {
         SpringApplication.run(GoormthonApplication.class, args);
     }
 
-    @GetMapping("/health")
+    @GetMapping("/api/health")
     public String health() {
         return "ok";
     }
