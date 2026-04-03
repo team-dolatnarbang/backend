@@ -15,11 +15,12 @@ public class ContributionSttScheduler {
 
     private final ContributionService contributionService;
     private final ClovaSttClient clovaSttClient;
+    private final ClovaTtsClient clovaTtsClient;
 
-    // QUEUED 상태의 업로드를 주기적으로 STT 처리한다. (운영에서는 모니터링/재시도 정책 필요)
+    // QUEUED 상태의 업로드를 STT 처리한다.
     @Scheduled(fixedDelayString = "${stt.worker.fixed-delay-ms:5000}")
     @Transactional
-    public void runOnce() {
+    public void runStt() {
         for (ElderContribution queued : contributionService.findQueuedTop10()) {
             try {
                 contributionService.markProcessing(queued.getId());
@@ -28,7 +29,7 @@ public class ContributionSttScheduler {
                 if (transcript == null || transcript.isBlank()) {
                     contributionService.markFailed(queued.getId(), "STT_EMPTY", "Transcript was empty");
                 } else {
-                    contributionService.saveTranscriptAndPublish(queued.getId(), transcript);
+                    contributionService.saveTranscript(queued.getId(), transcript);
                 }
             } catch (ApiException e) {
                 Object reason = e.getDetails().get("reason");
@@ -39,5 +40,28 @@ public class ContributionSttScheduler {
             }
         }
     }
-}
 
+    // STT_DONE 상태의 텍스트를 TTS 처리하여 오디오를 생성한다.
+    @Scheduled(fixedDelayString = "${stt.worker.fixed-delay-ms:5000}")
+    @Transactional
+    public void runTts() {
+        for (ElderContribution sttDone : contributionService.findSttDoneTop10()) {
+            try {
+                String text = sttDone.getRawTranscript();
+                if (text == null || text.isBlank()) {
+                    contributionService.markFailed(sttDone.getId(), "TTS_EMPTY_INPUT", "No transcript to synthesize");
+                    continue;
+                }
+
+                String ttsAudioUrl = clovaTtsClient.synthesize(text);
+                contributionService.saveTtsAndPublish(sttDone.getId(), ttsAudioUrl);
+            } catch (ApiException e) {
+                Object reason = e.getDetails().get("reason");
+                String message = (reason == null ? "" : ("reason=" + reason + " ")) + e.getMessage();
+                contributionService.markFailed(sttDone.getId(), "TTS_FAILED", message);
+            } catch (Exception e) {
+                contributionService.markFailed(sttDone.getId(), "TTS_FAILED", e.getMessage());
+            }
+        }
+    }
+}
