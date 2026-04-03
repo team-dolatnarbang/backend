@@ -86,6 +86,11 @@ public class ContributionService {
         return elderContributionRepository.findTop10ByStatusOrderByCreatedAtAsc(ElderContribution.Status.QUEUED);
     }
 
+    @Transactional(readOnly = true)
+    public List<ElderContribution> findSttDoneTop10() {
+        return elderContributionRepository.findTop10ByStatusOrderByCreatedAtAsc(ElderContribution.Status.STT_DONE);
+    }
+
     public ElderContribution markProcessing(UUID contributionId) {
         Objects.requireNonNull(contributionId, "contributionId");
         String contributionIdValue = contributionId.toString();
@@ -99,7 +104,7 @@ public class ContributionService {
         return contribution;
     }
 
-    public ElderContribution saveTranscriptAndPublish(UUID contributionId, String rawTranscript) {
+    public ElderContribution saveTranscript(UUID contributionId, String rawTranscript) {
         Objects.requireNonNull(contributionId, "contributionId");
         String contributionIdValue = contributionId.toString();
         ElderContribution contribution = elderContributionRepository.findById(contributionId)
@@ -109,6 +114,22 @@ public class ContributionService {
                 ));
 
         contribution.setRawTranscript(rawTranscript);
+        contribution.setStatus(ElderContribution.Status.STT_DONE);
+        contribution.setErrorCode(null);
+        contribution.setErrorMessage(null);
+        return elderContributionRepository.save(contribution);
+    }
+
+    public ElderContribution saveTtsAndPublish(UUID contributionId, String ttsAudioUrl) {
+        Objects.requireNonNull(contributionId, "contributionId");
+        String contributionIdValue = contributionId.toString();
+        ElderContribution contribution = elderContributionRepository.findById(contributionId)
+                .orElseThrow(() -> new ApiException(
+                        ErrorCode.NOT_FOUND,
+                        Map.of("contributionId", contributionIdValue)
+                ));
+
+        contribution.setTtsAudioUrl(ttsAudioUrl);
         contribution.setStatus(ElderContribution.Status.PUBLISHED);
         contribution.setErrorCode(null);
         contribution.setErrorMessage(null);

@@ -34,9 +34,6 @@ spec:
         envFrom:
         - secretRef:
             name: clova-stt-secret
-        env:
-        - name: SERVER_SERVLET_CONTEXT_PATH
-          value: "/api"
         volumeMounts:
         - name: config-volume
           mountPath: /app/config

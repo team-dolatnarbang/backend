@@ -81,10 +81,12 @@ public class ClovaSttClient {
             throw new ApiException(ErrorCode.INTERNAL_ERROR);
         }
 
+        HttpHeaders paramsHeaders = new HttpHeaders();
+        paramsHeaders.setContentType(MediaType.APPLICATION_JSON);
+
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("media", media);
-        body.add("params", paramsJson);
-        body.add("type", "application/json");
+        body.add("params", new HttpEntity<>(paramsJson, paramsHeaders));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
