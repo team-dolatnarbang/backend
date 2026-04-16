@@ -67,9 +67,10 @@ public class TributeService {
             return toCreateResponse(existing);
         }
 
-        if (!listenCompletionService.hasCompletedAllSites(sessionId, resetVersion)) {
-            throw new ApiException(ErrorCode.TRIBUTE_NOT_ALLOWED_YET);
-        }
+        // 잠시 주석
+        // if (!listenCompletionService.hasCompletedAllSites(sessionId, resetVersion)) {
+        //     throw new ApiException(ErrorCode.TRIBUTE_NOT_ALLOWED_YET);
+        // }
 
         long totalSites = siteRepository.count();
 

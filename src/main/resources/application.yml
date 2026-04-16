@@ -2,8 +2,8 @@ spring:
   application:
     name: backend
   datasource:
-    url: jdbc:postgresql://postgres:5432/groomthon
-    #url: jdbc:postgresql://localhost:5432/groomthon
+    #url: jdbc:postgresql://postgres:5432/groomthon
+    url: jdbc:postgresql://localhost:5432/groomthon
     username: postgres
     password: postgres
   jpa:
@@ -28,6 +28,10 @@ clova:
   stt:
     invoke-url: ${CLOVA_STT_INVOKE_URL:}
     secret: ${CLOVA_STT_SECRET:}
+  tts:
+    invoke-url: ${CLOVA_TTS_INVOKE_URL:}
+    client-id: ${CLOVA_TTS_CLIENT_ID:}
+    client-secret: ${CLOVA_TTS_CLIENT_SECRET:}
 
 stt:
   worker:
