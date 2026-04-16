@@ -3,7 +3,6 @@ package com.example.backend.controller.stats;
 import com.example.backend.common.response.ApiResponse;
 import com.example.backend.dto.stats.StatsResponse;
 import com.example.backend.service.stats.StatsService;
-import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +21,7 @@ public class StatsController {
     public ResponseEntity<ApiResponse<StatsResponse>> getStats() {
         StatsResponse body = statsService.getPublicStats();
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(600, TimeUnit.SECONDS).cachePublic())
+                .cacheControl(CacheControl.noStore())
                 .body(ApiResponse.ok(body));
     }
 }
